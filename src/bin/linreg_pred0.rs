@@ -19,57 +19,57 @@ use std::fs::File;
 
 fn main() -> Result<(), Box<dyn Error>> {
 
-    println!("loading LWE key... \n");
-    let path = "keys";
-    let sk0_LWE_path = format!("{}/sk0_LWE.json",path);
-    let sk0 = LWESecretKey::load(&sk0_LWE_path).unwrap();    
-    
-    // Read parameters of the linear regression
-    
+    println!("Load parameters for linear regression ... ");
     let file = File::open("data/coeff.csv")?;
     let mut reader = ReaderBuilder::new().has_headers(false).from_reader(file);
     let coeff: Array2<f64> = reader.deserialize_array2_dynamic().unwrap();
     let coeff = coeff.column(0).to_vec();
-    println!("{:?}",coeff);
+    println!("Number of coefficients {}",coeff.len());
     
     let file = File::open("data/intercept.csv")?;
     let mut reader = ReaderBuilder::new().has_headers(false).from_reader(file);
     let intercept: Array2<f64> = reader.deserialize_array2_dynamic().unwrap();
     let intercept = intercept.column(0).to_vec();
-    println!("{:?}",intercept);
+    println!("Intercept {:?}",intercept.len());
     
     let offset = vec![intercept[0]/coeff.len() as f64; coeff.len()];    
     
     let max_constant: f64 = 0.5;
     let nb_bit_padding = 8;
+    let N = 102;
 
+    // This is only for debugging
+    println!("DEBUG: Load LWE secret key ... \n");
+    let path = "keys";
+    let sk0_LWE_path = format!("{}/sk0_LWE.json",path);
+    let sk0 = LWESecretKey::load(&sk0_LWE_path).unwrap();    
+    
+    println!("DEBUG: Load ground truth data ... \n");
     let file = File::open("data/y_test.csv").expect("could not read data file");
     let mut reader = ReaderBuilder::new().has_headers(false).from_reader(file);
     let y_test: Array2<f64> = reader.deserialize_array2_dynamic().expect("conversion error");
-    println!("{:?}",y_test.dim());
+    //let N = y_test.shape()[0];
+    // **************************
     
-    let N = y_test.shape()[0];
     println!("Number of data rows: {}", N);
     
-    for i in 0..N {
-        if false && i==5 {
-            break;
-        };
-        
+    for i in 0..N {        
         let encfile = format!("data/X_test/{}.enc",i);
-        println!("\n{}", encfile);
-        let mut terms = VectorLWE::load(&encfile).unwrap();
-        terms.mul_constant_with_padding_inplace(&coeff, max_constant, nb_bit_padding)?;
-        println!("terms {:?}", terms.decrypt_decode(&sk0).unwrap());
-
-        terms.add_constant_static_encoder_inplace(&offset)?; 
-        println!("terms {:?}", terms.decrypt_decode(&sk0).unwrap());
-  
-        let price = terms.sum_with_new_min(0.).unwrap();
-        println!("pred price {:?}", price.decrypt_decode(&sk0).unwrap());
-        //price.pp(); 
-
-        println!("true price {:?}", y_test.row(i).to_vec());
+        println!("{}", encfile);
+        
+        let features = VectorLWE::load(&encfile).unwrap();
+        let terms = features.mul_constant_with_padding(&coeff, max_constant, nb_bit_padding)?;
+        let temps = terms.add_constant_static_encoder(&offset)?; 
+        let price = temps.sum_with_new_min(0.).unwrap();
+        
+        // This is only for debugging
+        if i<5 {
+            println!("DEBUG: terms {:?}", terms.decrypt_decode(&sk0).unwrap()); 
+            println!("DEBUG: temps {:?}", temps.decrypt_decode(&sk0).unwrap()); 
+            println!("DEBUG: pred price {:?}", price.decrypt_decode(&sk0).unwrap()); 
+            println!("DEBUG: true price {:?}", y_test.row(i).to_vec());
+        }
+        // **************************
 
         let encfile = format!("data/y_test0/{}.enc",i);
         price.save(&encfile).unwrap();
