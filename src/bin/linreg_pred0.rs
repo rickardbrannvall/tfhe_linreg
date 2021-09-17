@@ -32,9 +32,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let intercept = intercept.column(0).to_vec();
     println!("Intercept {:?}",intercept.len());
     
-    let offset = vec![intercept[0]/coeff.len() as f64; coeff.len()];    
+    //let offset = vec![intercept[0]/coeff.len() as f64; coeff.len()];    
     
-    let max_constant: f64 = 0.5;
+    let max_constant: f64 = 1.0;
     let nb_bit_padding = 8;
     let N = 102;
 
@@ -54,19 +54,25 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Number of data rows: {}", N);
     
     for i in 0..N {        
-        let encfile = format!("data/X_test/{}.enc",i);
+        let encfile = format!("data/X_test0/{}.enc",i);
         println!("{}", encfile);
         
         let features = VectorLWE::load(&encfile).unwrap();
         let terms = features.mul_constant_with_padding(&coeff, max_constant, nb_bit_padding)?;
-        let temps = terms.add_constant_static_encoder(&offset)?; 
-        let price = temps.sum_with_new_min(0.).unwrap();
+        //let temps = terms.add_constant_static_encoder(&offset)?; 
+        //let price = temps.sum_with_new_min(0.).unwrap();
+        let temps = terms.sum_with_new_min(-28.).unwrap(); 
+        let price = temps.add_constant_dynamic_encoder(&intercept)?;
         
         // This is only for debugging
-        if i<5 {
-            println!("DEBUG: terms {:?}", terms.decrypt_decode(&sk0).unwrap()); 
+        if true && i<5 {
+            //features.pp();
+            println!("DEBUG: terms {:?}", terms.decrypt_decode(&sk0).unwrap());
+            //terms.pp();
             println!("DEBUG: temps {:?}", temps.decrypt_decode(&sk0).unwrap()); 
+            //temps.pp();
             println!("DEBUG: pred price {:?}", price.decrypt_decode(&sk0).unwrap()); 
+            //price.pp();
             println!("DEBUG: true price {:?}", y_test.row(i).to_vec());
         }
         // **************************

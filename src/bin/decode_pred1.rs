@@ -18,9 +18,10 @@ use std::fs::File;
 // replace vector format with scalar
 
 fn main() -> Result<(), CryptoAPIError> {
+    let path = "keys_80_2048_60_64";
+    //let path = "keys";
 
     println!("Load LWE secret key ... ");
-    let path = "keys";
     let sk0_LWE_path = format!("{}/sk0_LWE.json",path);
     let sk0 = LWESecretKey::load(&sk0_LWE_path).unwrap();    
 
@@ -41,7 +42,7 @@ fn main() -> Result<(), CryptoAPIError> {
             break;
         };
         
-        let encfile = format!("data/y_test0/{}.enc",i);
+        let encfile = format!("data/y_test1/{}.enc",i);
         let pred = VectorLWE::load(&encfile).unwrap();
         
         y_pred[[i,0]] = pred.decrypt_decode(&sk0).unwrap()[0];
@@ -52,9 +53,9 @@ fn main() -> Result<(), CryptoAPIError> {
     let err = &y_pred - &y_test;
     println!("Mean Average Error: {}", err.mapv(|x| x.abs()).mean().unwrap());
 
-    let file = File::create("data/y_test0/y_test.csv").expect("could not create file");
+    let file = File::create("data/y_test1/y_test.csv").expect("could not create file");
     let mut writer = WriterBuilder::new().has_headers(false).from_writer(file);
     writer.serialize_array2(&y_pred).expect("could not write file");    
-        
+    
     Ok(())
 }
